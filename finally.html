@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Logistics Auction </title>
+  <!-- Using fixed CDN versions of web3.js and ethers -->
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-3xl font-bold mb-4 text-center">📦 Logistics Auction </h1>
+
+    <!-- Network Selection -->
+    <div class="bg-white rounded p-4 shadow mb-6">
+      <h2 class="text-xl font-semibold mb-2">Network Configuration</h2>
+      <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
+        <select id="networkSelect" class="border p-2 rounded">
+          <option value="1">Ethereum Mainnet</option>
+          <option value="5">Goerli Testnet</option>
+          <option value="11155111" selected>Sepolia Testnet</option>
+          <option value="137">Polygon Mainnet</option>
+          <option value="80001">Polygon Mumbai</option>
+          <option value="56">BSC Mainnet</option>
+          <option value="97">BSC Testnet</option>
+        </select>
+        <button id="switchNetworkBtn" class="bg-indigo-600 text-white px-4 py-2 rounded">Switch Network</button>
+        <input id="customContractAddress" class="border p-2 flex-grow" placeholder="Contract Address" value="0x85d6ac382e63773c460cb019fa348f7555c6e2de">
+        <button id="setContractBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Set Contract</button>
+      </div>
+    </div>
+
+    <!-- Wallet Connect Section -->
+    <div class="bg-white rounded p-4 shadow mb-6">
+      <h2 class="text-xl font-semibold mb-2">Account Management</h2>
+      <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
+        <button id="connectBtn" class="bg-blue-600 text-white px-4 py-2 rounded">🔗 Connect Wallet</button>
+        <button id="changeAccountBtn" class="bg-purple-600 text-white px-4 py-2 rounded">🔄 Change Account</button>
+      </div>
+      <div id="accountInfo" class="mt-2">
+        <p><strong>Status:</strong> <span id="connectionStatus" class="text-red-600">Not connected</span></p>
+        <p><strong>Current Account:</strong> <span id="currentAccount" class="text-green-600 font-mono">-</span></p>
+        <p><strong>Network:</strong> <span id="networkInfo" class="text-blue-600">-</span></p>
+        <p><strong>Balance:</strong> <span id="accountBalance" class="text-green-600">-</span> ETH</p>
+      </div>
+    </div>
+
+    <!-- Debug Information Panel -->
+    <div class="bg-gray-800 text-white rounded p-4 shadow mb-6">
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-semibold mb-2">Debug Information</h2>
+        <div>
+          <button id="checkContractBtn" class="bg-yellow-600 text-white px-3 py-1 rounded mr-2">Check Contract</button>
+          <button id="getRequestCountBtn" class="bg-green-600 text-white px-3 py-1 rounded">Request Count</button>
+        </div>
+      </div>
+      <div id="debugInfo" class="mt-2 font-mono text-sm overflow-auto max-h-40 bg-gray-900 p-3 rounded">
+        Waiting for connection...
+      </div>
+    </div>
+
+    <!-- Create Request -->
+    <div class="bg-white rounded p-4 shadow mb-6">
+      <h2 class="text-xl font-semibold mb-2">Create Transport Request</h2>
+      <input id="itemId" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Item ID (itemId)">
+      <input id="deposit" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Deposit (ETH)" type="number" step="0.001" min="0.001">
+      <button id="createRequestBtn" class="bg-green-600 text-white px-4 py-2 rounded">Create Request</button>
+      <div id="createRequestStatus" class="mt-2"></div>
+    </div>
+
+    <!-- Place Bid -->
+    <div class="bg-white rounded p-4 shadow mb-6">
+      <h2 class="text-xl font-semibold mb-2">Place Transport Bid</h2>
+      <input id="bidRequestId" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Request ID" type="number" min="1">
+      <input id="bidPrice" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Price (wei)" type="number" min="1">
+      <button id="placeBidBtn" class="bg-yellow-600 text-white px-4 py-2 rounded">Place Bid</button>
+      <button id="viewBidsBtn" class="bg-blue-600 text-white px-4 py-2 rounded mt-2">View Bids</button>
+      <div id="bidStatus" class="mt-2"></div>
+      <div id="bidsResult" class="mt-2"></div>
+    </div>
+
+    <!-- Finalize -->
+    <div class="bg-white rounded p-4 shadow mb-6">
+      <h2 class="text-xl font-semibold mb-2">Finalize Order</h2>
+      <input id="finalizeId" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Request ID" type="number" min="1">
+      <button id="finalizeRequestBtn" class="bg-red-600 text-white px-4 py-2 rounded">Finalize</button>
+      <div id="finalizeStatus" class="mt-2"></div>
+      <div id="winnerInfo" class="mt-3 p-3 bg-green-100 rounded hidden">
+        <h3 class="font-bold">Winner Information:</h3>
+        <p><strong>Address:</strong> <span id="winnerAddress" class="font-mono"></span></p>
+        <p><strong>Winning Price:</strong> <span id="winningPrice"></span> wei</p>
+        <p><strong>Winner Balance:</strong> <span id="winnerBalance"></span> ETH</p>
+      </div>
+    </div>
+
+    <!-- View Request Info -->
+    <div class="bg-white rounded p-4 shadow mb-6">
+      <h2 class="text-xl font-semibold mb-2">View Request Information</h2>
+      <input id="requestInfoId" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Request ID" type="number" min="1">
+      <button id="getRequestInfoBtn" class="bg-indigo-600 text-white px-4 py-2 rounded">View Info</button>
+      <div id="requestInfo" class="mt-2"></div>
+    </div>
+
+    <!-- Feedback -->
+    <div class="bg-white rounded p-4 shadow mb-6">
+      <h2 class="text-xl font-semibold mb-2">Submit Feedback</h2>
+      <input id="fbId" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Request ID" type="number" min="1">
+      <input id="rating" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Stars (1-5)" type="number" min="1" max="5">
+      <input id="comment" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Comment">
+      <button id="submitFeedbackBtn" class="bg-purple-600 text-white px-4 py-2 rounded">Submit Feedback</button>
+      <div id="feedbackStatus" class="mt-2"></div>
+    </div>
+
+    <!-- View Feedback -->
+    <div class="bg-white rounded p-4 shadow mb-6">
+      <h2 class="text-xl font-semibold mb-2">View Feedback</h2>
+      <input id="feedbackReqId" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Request ID" type="number" min="1">
+      <input id="userAddr" class="border p-2 mr-2 w-full sm:w-auto mb-2 sm:mb-0" placeholder="Wallet Address">
+      <button id="getFeedbackBtn" class="bg-indigo-600 text-white px-4 py-2 rounded">View Feedback</button>
+      <div id="feedbackResult" class="mt-2"></div>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="bg-white rounded p-4 shadow mb-6">
+      <h2 class="text-xl font-semibold mb-2">Transaction History</h2>
+      <button id="loadTransactionsBtn" class="bg-blue-600 text-white px-4 py-2 rounded">Load Recent Transactions</button>
+      <div id="transactionHistory" class="mt-4 max-h-80 overflow-auto">
+        <table class="min-w-full border">
+          <thead>
+            <tr class="bg-gray-100">
+              <th class="border p-2">Type</th>
+              <th class="border p-2">Hash</th>
+              <th class="border p-2">Block</th>
+              <th class="border p-2">Status</th>
+              <th class="border p-2">Time</th>
+            </tr>
+          </thead>
+          <tbody id="transactionList">
+            <tr>
+              <td colspan="5" class="text-center p-4">No transactions loaded</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Contract Configuration
+    let contractAddress = "0x85d6ac382e63773c460cb019fa348f7555c6e2de";
+    const abi =[
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "provider",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "price",
+				"type": "uint256"
+			}
+		],
+		"name": "BidPlaced",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_itemId",
+				"type": "string"
+			}
+		],
+		"name": "createRequest",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "by",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "rating",
+				"type": "uint8"
+			}
+		],
+		"name": "FeedbackSubmitted",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_reqId",
+				"type": "uint256"
+			}
+		],
+		"name": "finalizeRequest",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_reqId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_price",
+				"type": "uint256"
+			}
+		],
+		"name": "placeBid",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "customer",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "RefundIssued",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "customer",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "itemId",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "deposit",
+				"type": "uint256"
+			}
+		],
+		"name": "RequestCreated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "winner",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "price",
+				"type": "uint256"
+			}
+		],
+		"name": "RequestFinalized",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_reqId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint8",
+				"name": "_rating",
+				"type": "uint8"
+			},
+			{
+				"internalType": "string",
+				"name": "_comment",
+				"type": "string"
+			}
+		],
+		"name": "submitFeedback",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "balances",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_reqId",
+				"type": "uint256"
+			}
+		],
+		"name": "getBids",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "address payable",
+						"name": "provider",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "price",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct LogisticsAuction.Bid[]",
+				"name": "",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_reqId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "_who",
+				"type": "address"
+			}
+		],
+		"name": "getFeedback",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint8",
+						"name": "rating",
+						"type": "uint8"
+					},
+					{
+						"internalType": "string",
+						"name": "comment",
+						"type": "string"
+					},
+					{
+						"internalType": "bool",
+						"name": "exists",
+						"type": "bool"
+					}
+				],
+				"internalType": "struct LogisticsAuction.Feedback",
+				"name": "",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "requestCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "requests",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "customer",
+				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "itemId",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "deposit",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "finalized",
+				"type": "bool"
+			},
+			{
+				"internalType": "address payable",
+				"name": "winner",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+];
+
+    // Global variables
+    let provider, signer, contract;
+    let web3, currentAccount = null;
+    let currentChainId = null;
+    let usingEthers = false;
+    let transactions = [];
+
+    // Helper function to display messages
+    function showStatus(elementId, message, isError = false) {
+      const element = document.getElementById(elementId);
+      element.innerHTML = `<p class="${isError ? 'text-red-600' : 'text-green-600'} font-semibold">${message}</p>`;
+      
+      // Auto-clear message after 5 seconds if not an error
+      if (!isError) {
+        setTimeout(() => {
+          element.innerHTML = '';
+        }, 5000);
+      }
+    }
+
+    // Format Ethereum address
+    function formatAddress(address) {
+      if (!address) return '-';
+      return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+    }
+
+    // Format timestamp to date/time
+    function formatTimestamp(timestamp) {
+      const date = new Date(timestamp * 1000);
+      return date.toLocaleString();
+    }
+
+    // Add message to debug panel with timestamp
+    function addDebugMessage(message, isError = false) {
+      const debugInfo = document.getElementById('debugInfo');
+      const timestamp = new Date().toLocaleTimeString();
+      const msgClass = isError ? 'text-red-400' : 'text-green-400';
+      
+      debugInfo.innerHTML += `<div class="${msgClass}">[${timestamp}] ${message}</div>`;
+      debugInfo.scrollTop = debugInfo.scrollHeight; // Scroll to bottom
+    }
+
+    // Check and initialize the app when the page loads
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('customContractAddress').value = contractAddress;
+      checkWalletConnection();
+      setupEventListeners();
+    });
+
+    // Set up event listeners for buttons
+    function setupEventListeners() {
+      document.getElementById('connectBtn').addEventListener('click', connectWallet);
+      document.getElementById('changeAccountBtn').addEventListener('click', changeAccount);
+      document.getElementById('createRequestBtn').addEventListener('click', createRequest);
+      document.getElementById('placeBidBtn').addEventListener('click', placeBid);
+      document.getElementById('viewBidsBtn').addEventListener('click', viewBids);
+      document.getElementById('finalizeRequestBtn').addEventListener('click', finalizeRequest);
+      document.getElementById('getRequestInfoBtn').addEventListener('click', getRequestInfo);
+      document.getElementById('submitFeedbackBtn').addEventListener('click', submitFeedback);
+      document.getElementById('getFeedbackBtn').addEventListener('click', getFeedback);
+      document.getElementById('checkContractBtn').addEventListener('click', checkContract);
+      document.getElementById('getRequestCountBtn').addEventListener('click', getRequestCount);
+      document.getElementById('setContractBtn').addEventListener('click', setContractAddress);
+      document.getElementById('switchNetworkBtn').addEventListener('click', switchNetwork);
+      document.getElementById('loadTransactionsBtn').addEventListener('click', loadTransactionHistory);
+    }
+
+    // Switch to selected network
+    async function switchNetwork() {
+      try {
+        if (!window.ethereum) {
+          addDebugMessage("MetaMask not installed", true);
+          return;
+        }
+        
+        const networkId = document.getElementById('networkSelect').value;
+        let chainIdHex = '0x' + parseInt(networkId).toString(16);
+        
+        // Network parameters for common networks
+        const networks = {
+          '1': { chainId: '0x1', name: 'Ethereum Mainnet' },
+          '5': { chainId: '0x5', name: 'Goerli Testnet' },
+          '11155111': { chainId: '0xaa36a7', name: 'Sepolia Testnet' },
+          '137': { chainId: '0x89', name: 'Polygon Mainnet' },
+          '80001': { chainId: '0x13881', name: 'Polygon Mumbai' },
+          '56': { chainId: '0x38', name: 'BSC Mainnet' },
+          '97': { chainId: '0x61', name: 'BSC Testnet' }
+        };
+        
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: networks[networkId].chainId }],
+          });
+          addDebugMessage(`Switched to ${networks[networkId].name}`);
+        } catch (switchError) {
+          // This error code indicates that the chain has not been added to MetaMask
+          if (switchError.code === 4902) {
+            addDebugMessage(`${networks[networkId].name} needs to be added to MetaMask`, true);
+          } else {
+            addDebugMessage(`Error switching network: ${switchError.message}`, true);
+          }
+        }
+      } catch (error) {
+        addDebugMessage(`Error: ${error.message}`, true);
+      }
+    }
+
+    // Set contract address from input
+    function setContractAddress() {
+      try {
+        const newAddress = document.getElementById('customContractAddress').value;
+        
+        if (!ethers.utils.isAddress(newAddress)) {
+          addDebugMessage("Invalid contract address format", true);
+          return;
+        }
+        
+        contractAddress = newAddress;
+        addDebugMessage(`Contract address set to: ${newAddress}`);
+        
+        // Reinitialize contract with new address
+        if (currentAccount) {
+          if (usingEthers) {
+            contract = new ethers.Contract(contractAddress, abi, signer);
+          } else {
+            contract = new web3.eth.Contract(abi, contractAddress);
+          }
+          checkContract();
+        }
+      } catch (error) {
+        addDebugMessage(`Error setting contract address: ${error.message}`, true);
+      }
+    }
+
+    // Check if contract exists and is valid
+    async function checkContract() {
+      try {
+        if (!currentAccount) {
+          addDebugMessage("Please connect wallet first", true);
+          return;
+        }
+        
+        addDebugMessage(`Checking contract at ${contractAddress}...`);
+        
+        if (usingEthers) {
+          try {
+            const code = await provider.getCode(contractAddress);
+            if (code === '0x') {
+              addDebugMessage(`No contract found at address: ${contractAddress}`, true);
+            } else {
+              // Try to call a function to verify ABI compatibility
+              try {
+                const count = await contract.requestCount();
+                addDebugMessage(`Contract verified! Request count: ${count.toString()}`);
+              } catch (funcError) {
+                addDebugMessage(`Contract exists but may have incompatible ABI: ${funcError.message}`, true);
+              }
+            }
+          } catch (error) {
+            addDebugMessage(`Error checking contract: ${error.message}`, true);
+          }
+        } else {
+          try {
+            const code = await web3.eth.getCode(contractAddress);
+            if (code === '0x') {
+              addDebugMessage(`No contract found at address: ${contractAddress}`, true);
+            } else {
+              // Try to call a function to verify ABI compatibility
+              try {
+                const count = await contract.methods.requestCount().call();
+                addDebugMessage(`Contract verified! Request count: ${count}`);
+              } catch (funcError) {
+                addDebugMessage(`Contract exists but may have incompatible ABI: ${funcError.message}`, true);
+              }
+            }
+          } catch (error) {
+            addDebugMessage(`Error checking contract: ${error.message}`, true);
+          }
+        }
+      } catch (error) {
+        addDebugMessage(`Error: ${error.message}`, true);
+      }
+    }
+
+    // Get total request count
+    async function getRequestCount() {
+      try {
+        if (!currentAccount) {
+          addDebugMessage("Please connect wallet first", true);
+          return;
+        }
+        
+        addDebugMessage(`Getting request count...`);
+        
+        if (usingEthers) {
+          try {
+            const count = await contract.requestCount();
+            addDebugMessage(`Total requests: ${count.toString()}`);
+          } catch (error) {
+            addDebugMessage(`Error getting request count: ${error.message}`, true);
+          }
+        } else {
+          try {
+            const count = await contract.methods.requestCount().call();
+            addDebugMessage(`Total requests: ${count}`);
+          } catch (error) {
+            addDebugMessage(`Error getting request count: ${error.message}`, true);
+          }
+        }
+      } catch (error) {
+        addDebugMessage(`Error: ${error.message}`, true);
+      }
+    }
+
+    // Check wallet connection when page loads
+    async function checkWalletConnection() {
+      try {
+        // Check for Web3 providers
+        if (window.ethereum) {
+          console.log("Detected provider: window.ethereum");
+          
+          // Set up listeners for account and network changes
+          window.ethereum.on('accountsChanged', handleAccountsChanged);
+          window.ethereum.on('chainChanged', () => window.location.reload());
+          
+          // Check for connected accounts
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          
+          if (accounts.length > 0) {
+            console.log("Account already connected:", accounts[0]);
+            initializeWithEthers(accounts[0]);
+          } else {
+            updateUIForDisconnectedState();
+          }
+        } else if (window.web3) {
+          console.log("Detected provider: legacy web3");
+          web3 = new Web3(window.web3.currentProvider);
+          
+          try {
+            const accounts = await web3.eth.getAccounts();
+            if (accounts.length > 0) {
+              console.log("Account already connected (legacy):", accounts[0]);
+              initializeWithWeb3(accounts[0]);
+            } else {
+              updateUIForDisconnectedState();
+            }
+          } catch (error) {
+            console.error("Could not get accounts from legacy web3:", error);
+            updateUIForDisconnectedState();
+          }
+        } else {
+          console.warn("No MetaMask or Web3 provider detected");
+          updateUIForDisconnectedState("MetaMask not installed", true);
+        }
+      } catch (error) {
+        console.error("Error checking wallet connection:", error);
+        updateUIForDisconnectedState("Initialization error: " + error.message, true);
+      }
+    }
+
+    // Update UI when disconnected
+    function updateUIForDisconnectedState(message = "Not connected", isError = false) {
+      document.getElementById("connectionStatus").textContent = message;
+      document.getElementById("connectionStatus").className = isError ? "text-red-600" : "text-yellow-600";
+      document.getElementById("currentAccount").textContent = "-";
+      document.getElementById("networkInfo").textContent = "-";
+      document.getElementById("accountBalance").textContent = "-";
+      
+      addDebugMessage(message, isError);
+      
+      // Disable functionality buttons when disconnected
+      const functionalButtons = [
+        'createRequestBtn', 'placeBidBtn', 'viewBidsBtn', 'finalizeRequestBtn',
+        'getRequestInfoBtn', 'submitFeedbackBtn', 'getFeedbackBtn', 'checkContractBtn',
+        'getRequestCountBtn', 'loadTransactionsBtn'
+      ];
+      
+      functionalButtons.forEach(btnId => {
+        document.getElementById(btnId).disabled = true;
+        document.getElementById(btnId).classList.add('opacity-50');
+      });
+    }
+
+    // Connect wallet using MetaMask
+    async function connectWallet() {
+      try {
+        if (window.ethereum) {
+          try {
+            // Request account access
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            initializeWithEthers(accounts[0]);
+          } catch (error) {
+            console.error("User denied account access:", error);
+            addDebugMessage("User denied account access", true);
+          }
+        } else if (window.web3) {
+          try {
+            web3 = new Web3(window.web3.currentProvider);
+            const accounts = await web3.eth.getAccounts();
+            if (accounts.length > 0) {
+              initializeWithWeb3(accounts[0]);
+            } else {
+              addDebugMessage("No accounts found in web3", true);
+            }
+          } catch (error) {
+            addDebugMessage(`Error connecting wallet: ${error.message}`, true);
+          }
+        } else {
+          addDebugMessage("Please install MetaMask or another Web3 wallet", true);
+        }
+      } catch (error) {
+        addDebugMessage(`Connection error: ${error.message}`, true);
+      }
+    }
+
+    // Initialize using ethers.js
+    async function initializeWithEthers(account) {
+      try {
+        currentAccount = account;
+        usingEthers = true;
+        
+        // Initialize provider
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+        
+        // Initialize contract
+        contract = new ethers.Contract(contractAddress, abi, signer);
+        
+        // Get network information
+        const network = await provider.getNetwork();
+        currentChainId = network.chainId;
+        
+        // Get account balance
+        const balance = await provider.getBalance(account);
+        const formattedBalance = ethers.utils.formatEther(balance);
+        
+        // Update UI
+        updateUIForConnectedState(account, network.name, formattedBalance);
+        
+        addDebugMessage(`Connected with ethers.js: ${formatAddress(account)}`);
+      } catch (error) {
+        addDebugMessage(`Ethers initialization error: ${error.message}`, true);
+      }
+    }
+
+    // Initialize using web3.js
+    async function initializeWithWeb3(account) {
+      try {
+        currentAccount = account;
+        usingEthers = false;
+        
+        // Initialize contract
+        contract = new web3.eth.Contract(abi, contractAddress);
+        
+        // Get network information
+        const chainId = await web3.eth.getChainId();
+        currentChainId = chainId;
+        let networkName = "Unknown Network";
+        
+        // Map common chain IDs to network names
+        const networkMap = {
+          1: "Ethereum Mainnet",
+          3: "Ropsten Testnet",
+          4: "Rinkeby Testnet",
+          5: "Goerli Testnet",
+          42: "Kovan Testnet",
+          56: "BSC Mainnet",
+          97: "BSC Testnet",
+          137: "Polygon Mainnet",
+          80001: "Polygon Mumbai",
+          11155111: "Sepolia Testnet"
+        };
+        
+        if (networkMap[chainId]) {
+          networkName = networkMap[chainId];
+        }
+        
+        // Get account balance
+        const balanceWei = await web3.eth.getBalance(account);
+        const formattedBalance = web3.utils.fromWei(balanceWei, 'ether');
+        
+        // Update UI
+        updateUIForConnectedState(account, networkName, formattedBalance);
+        
+        addDebugMessage(`Connected with web3.js: ${formatAddress(account)}`);
+      } catch (error) {
+        addDebugMessage(`Web3 initialization error: ${error.message}`, true);
+      }
+    }
+
+    // Update UI for connected state
+    function updateUIForConnectedState(account, network, balance) {
+      document.getElementById("connectionStatus").textContent = "Connected";
+      document.getElementById("connectionStatus").className = "text-green-600";
+      document.getElementById("currentAccount").textContent = formatAddress(account);
+      document.getElementById("networkInfo").textContent = network;
+      document.getElementById("accountBalance").textContent = parseFloat(balance).toFixed(4);
+      
+      // Enable functionality buttons
+      const functionalButtons = [
+        'createRequestBtn', 'placeBidBtn', 'viewBidsBtn', 'finalizeRequestBtn',
+        'getRequestInfoBtn', 'submitFeedbackBtn', 'getFeedbackBtn', 'checkContractBtn',
+        'getRequestCountBtn', 'loadTransactionsBtn'
+      ];
+      
+      functionalButtons.forEach(btnId => {
+        document.getElementById(btnId).disabled = false;
+        document.getElementById(btnId).classList.remove('opacity-50');
+      });
+    }
+
+    // Handle account changes
+    function handleAccountsChanged(accounts) {
+      if (accounts.length === 0) {
+        // User disconnected all accounts
+        currentAccount = null;
+        updateUIForDisconnectedState("Wallet disconnected");
+      } else if (accounts[0] !== currentAccount) {
+        // User switched to a different account
+        if (usingEthers) {
+          initializeWithEthers(accounts[0]);
+        } else {
+          initializeWithWeb3(accounts[0]);
+        }
+      }
+    }
+
+    // Request account change
+    async function changeAccount() {
+      try {
+        if (window.ethereum) {
+          await window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
+        } else {
+          addDebugMessage("MetaMask not detected", true);
+        }
+      } catch (error) {
+        addDebugMessage(`Error changing account: ${error.message}`, true);
+      }
+    }
+    let requestAccount = null;  // Biến toàn cục để lưu tài khoản đã tạo request
+
+    async function createRequest() {
+      try {
+        if (!currentAccount) {
+          showStatus('createRequestStatus', "Please connect wallet first", true);
+          return;
+        }
+
+        const itemId = document.getElementById('itemId').value;
+        const depositEth = document.getElementById('deposit').value;
+
+        if (!itemId) {
+          showStatus('createRequestStatus', "Please enter an Item ID", true);
+          return;
+        }
+
+        if (!depositEth || parseFloat(depositEth) <= 0) {
+          showStatus('createRequestStatus', "Please enter a valid deposit amount", true);
+          return;
+        }
+
+        showStatus('createRequestStatus', "Creating request...");
+        addDebugMessage(`Creating request for item: ${itemId} with deposit: ${depositEth} ETH`);
+
+        let tx;
+        if (usingEthers) {
+          const depositWei = ethers.utils.parseEther(depositEth);
+          tx = await contract.createRequest(itemId, { value: depositWei });
+
+          showStatus('createRequestStatus', `Transaction submitted: ${tx.hash}`);
+          addDebugMessage(`Transaction submitted: ${tx.hash}`);
+
+          const receipt = await tx.wait();
+          showStatus('createRequestStatus', "Request created successfully!");
+          addDebugMessage(`Request confirmed in block: ${receipt.blockNumber}`);
+          requestAccount = currentAccount;
+
+          // ✅ Lấy requestId từ sự kiện
+          const event = receipt.events.find(e => e.event === 'RequestCreated');
+          let requestId = null;
+          if (event) {
+            requestId = event.args.id.toNumber();  // hoặc .toString() nếu bạn muốn chuỗi
+            document.getElementById("requestIdOutput").textContent = `Request ID: ${requestId}`;
+            addDebugMessage(`Request created with ID: ${requestId}`);
+          }
+
+          // Ghi vào lịch sử
+          transactions.push({
+            type: "Create Request",
+            hash: tx.hash,
+            block: receipt.blockNumber,
+            status: "Confirmed",
+            timestamp: Math.floor(Date.now() / 1000),
+            requestId: requestId
+          });
+
+        } else {
+          const depositWei = web3.utils.toWei(depositEth, 'ether');
+          tx = await contract.methods.createRequest(itemId).send({ 
+            from: currentAccount, 
+            value: depositWei 
+          });
+
+          showStatus('createRequestStatus', "Request created successfully!");
+          addDebugMessage(`Request created successfully in block: ${tx.blockNumber}`);
+          requestAccount = currentAccount;
+
+          // ✅ Lấy requestId từ sự kiện
+          let requestId = null;
+          if (tx.events && tx.events.RequestCreated) {
+            requestId = tx.events.RequestCreated.returnValues.id;
+            document.getElementById("requestIdOutput").textContent = `Request ID: ${requestId}`;
+            addDebugMessage(`Request created with ID: ${requestId}`);
+          }
+
+          // Ghi vào lịch sử
+          transactions.push({
+            type: "Create Request",
+            hash: tx.transactionHash,
+            block: tx.blockNumber,
+            status: "Confirmed",
+            timestamp: Math.floor(Date.now() / 1000),
+            requestId: requestId
+          });
+        }
+
+      } catch (error) {
+        showStatus('createRequestStatus', `Error: ${error.message}`, true);
+        addDebugMessage(`Error creating request: ${error.message}`, true);
+      }
+    }
+
+
+   // Place bid on transport request
+async function placeBid() {
+  try {
+    if (!currentAccount) {
+      showStatus('bidStatus', "Please connect wallet first", true);
+      return;
+    }
+    if (currentAccount === requestAccount) {
+      showStatus('bidStatus', "Creator cannot place a bid", true);
+      return;
+    }
+
+    const requestId = document.getElementById('bidRequestId').value;
+    const price = document.getElementById('bidPrice').value;
+
+    if (!requestId || parseInt(requestId) <= 0) {
+      showStatus('bidStatus', "Please enter a valid Request ID", true);
+      return;
+    }
+
+    if (!price || parseInt(price) <= 0) {
+      showStatus('bidStatus', "Please enter a valid price in wei", true);
+      return;
+    }
+
+    showStatus('bidStatus', "Placing bid...");
+    addDebugMessage(`Placing bid on request ${requestId} with price ${price} wei`);
+
+    let tx;
+    let finalRequestId = requestId; // fallback nếu không có event
+
+    if (usingEthers) {
+      tx = await contract.placeBid(requestId, price);
+      showStatus('bidStatus', `Transaction submitted: ${tx.hash}`);
+      addDebugMessage(`Transaction submitted: ${tx.hash}`);
+
+      const receipt = await tx.wait();
+      showStatus('bidStatus', "Bid placed successfully!");
+      addDebugMessage(`Bid placed successfully in block: ${receipt.blockNumber}`);
+
+      // ✅ Lấy requestId từ sự kiện (nếu contract phát ra)
+      const event = receipt.events.find(e => e.event === 'BidPlaced');
+      if (event) {
+        finalRequestId = event.args.id.toNumber();
+        document.getElementById("bidRequestIdOutput").textContent = `Bid on Request ID: ${finalRequestId}`;
+        addDebugMessage(`Bid placed on Request ID: ${finalRequestId}`);
+      }
+
+      transactions.push({
+        type: "Place Bid",
+        hash: tx.hash,
+        block: receipt.blockNumber,
+        status: "Confirmed",
+        timestamp: Math.floor(Date.now() / 1000),
+        requestId: finalRequestId
+      });
+
+    } else {
+      tx = await contract.methods.placeBid(requestId, price).send({ from: currentAccount });
+      showStatus('bidStatus', "Bid placed successfully!");
+      addDebugMessage(`Bid placed successfully in block: ${tx.blockNumber}`);
+
+      // ✅ Lấy requestId từ sự kiện (nếu có)
+      if (tx.events && tx.events.BidPlaced) {
+        finalRequestId = tx.events.BidPlaced.returnValues.id;
+        document.getElementById("bidRequestIdOutput").textContent = `Bid on Request ID: ${finalRequestId}`;
+        addDebugMessage(`Bid placed on Request ID: ${finalRequestId}`);
+      }
+
+      transactions.push({
+        type: "Place Bid",
+        hash: tx.transactionHash,
+        block: tx.blockNumber,
+        status: "Confirmed",
+        timestamp: Math.floor(Date.now() / 1000),
+        requestId: finalRequestId
+      });
+    }
+  } catch (error) {
+    showStatus('bidStatus', `Error: ${error.message}`, true);
+    addDebugMessage(`Error placing bid: ${error.message}`, true);
+  }
+}
+
+
+    // View bids for a request
+    async function viewBids() {
+      try {
+        if (!currentAccount) {
+          showStatus('bidsResult', "Please connect wallet first", true);
+          return;
+        }
+
+        // Lấy thông tin yêu cầu từ hợp đồng
+        const requestId = document.getElementById('bidRequestId').value;
+        
+        if (!requestId || parseInt(requestId) <= 0) {
+          showStatus('bidsResult', "Please enter a valid Request ID", true);
+          return;
+        }
+
+        // Lấy thông tin yêu cầu (bao gồm địa chỉ customer) từ hợp đồng
+        const request = await contract.requests(requestId);
+
+        // Kiểm tra xem tài khoản hiện tại có phải là customer (người tạo yêu cầu)
+        if (request.customer.toLowerCase() !== currentAccount.toLowerCase()) {
+          showStatus('bidsResult', 'Only the customer who created the request can view the bids', true);
+          return;
+        }
+
+        // Lấy danh sách bids từ hợp đồng
+        const bids = await contract.getBids(requestId);
+
+        if (bids.length === 0) {
+          document.getElementById('bidsResult').innerHTML = 
+            `<p class="text-yellow-600">No bids found for request ID ${requestId}</p>`;
+          return;
+        }
+
+        // Xây dựng bảng danh sách bids
+        let bidTable = `
+          <h3 class="font-bold mb-2">Bids for Request #${requestId}</h3>
+          <table class="min-w-full border">
+            <thead>
+              <tr class="bg-gray-100">
+                <th class="border p-2">Provider</th>
+                <th class="border p-2">Price (wei)</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+        bids.forEach(bid => {
+          const provider = bid.provider;
+          const price = bid.price.toString();
+
+          bidTable += `
+            <tr>
+              <td class="border p-2 font-mono">${formatAddress(provider)}</td>
+              <td class="border p-2">${price}</td>
+            </tr>`;
+        });
+
+        bidTable += `
+            </tbody>
+          </table>`;
+
+        document.getElementById('bidsResult').innerHTML = bidTable;
+      } catch (error) {
+        document.getElementById('bidsResult').innerHTML = 
+          `<p class="text-red-600">Error: ${error.message}</p>`;
+      }
+      }
+    
+    let lastCreatedRequestId = null; // Thêm ở ngoài hàm
+
+    async function finalizeRequest() {
+      try {
+        if (!currentAccount) {
+          showStatus('finalizeStatus', 'Please connect your wallet first', true);
+          return;
+        }
+
+        let requestId = document.getElementById('finalizeId').value;
+        if (!requestId) {
+          if (lastCreatedRequestId !== null) {
+            requestId = lastCreatedRequestId;
+            addDebugMessage(`Using last created requestId: ${requestId}`);
+          } else {
+            showStatus('finalizeStatus', 'Please enter a request ID or create one first', true);
+            return;
+          }
+        }
+
+        showStatus('finalizeStatus', 'Processing finalization...');
+        addDebugMessage(`Attempting to finalize request #${requestId}...`);
+
+        let requestInfo;
+        try {
+          requestInfo = usingEthers
+            ? await contract.requests(requestId)
+            : await contract.methods.requests(requestId).call();
+
+          const customerAddress = usingEthers ? requestInfo.customer : requestInfo[0];
+          const isFinalized = usingEthers ? requestInfo.finalized : requestInfo[3];
+
+          const zeroAddress = usingEthers
+            ? ethers.constants.AddressZero
+            : '0x0000000000000000000000000000000000000000';
+
+          if (customerAddress === zeroAddress) {
+            showStatus('finalizeStatus', 'Request does not exist', true);
+            return;
+          }
+
+          if (isFinalized) {
+            showStatus('finalizeStatus', 'Request is already finalized', true);
+            return;
+          }
+
+          if (customerAddress.toLowerCase() !== currentAccount.toLowerCase()) {
+            showStatus('finalizeStatus', 'Only the request creator can finalize', true);
+            return;
+          }
+        } catch (error) {
+          console.error('Error fetching request details:', error);
+          showStatus('finalizeStatus', `Error fetching request: ${error.message}`, true);
+          addDebugMessage(`Error fetching request #${requestId}: ${error.message}`);
+          return;
+        }
+
+        let tx;
+        if (usingEthers) {
+          try {
+            const gasEstimate = await contract.estimateGas.finalizeRequest(requestId);
+            tx = await contract.finalizeRequest(requestId, {
+              gasLimit: Math.floor(gasEstimate.toNumber() * 1.2)
+            });
+
+            showStatus('finalizeStatus', `Finalization submitted! Tx hash: ${tx.hash}`);
+            addDebugMessage(`Finalization tx submitted: ${tx.hash}`);
+
+            transactions.push({
+              type: 'Finalize',
+              hash: tx.hash,
+              status: 'Pending',
+              timestamp: Math.floor(Date.now() / 1000)
+            });
+
+            const receipt = await tx.wait();
+
+            if (receipt.status === 1) {
+              showStatus('finalizeStatus', 'Request finalized successfully!');
+              addDebugMessage(`Request #${requestId} finalized in block ${receipt.blockNumber}`);
+
+              const txIndex = transactions.findIndex(t => t.hash === tx.hash);
+              if (txIndex >= 0) {
+                transactions[txIndex].status = 'Confirmed';
+                transactions[txIndex].block = receipt.blockNumber;
+              }
+
+              const updatedRequest = await contract.requests(requestId);
+              const winner = updatedRequest.winner;
+
+              const bids = await contract.getBids(requestId);
+              let winningPrice = '0';
+              for (const bid of bids) {
+                if (bid.provider.toLowerCase() === winner.toLowerCase()) {
+                  winningPrice = bid.price.toString();
+                  break;
+                }
+              }
+
+              const winnerBalance = ethers.utils.formatEther(await provider.getBalance(winner));
+
+              document.getElementById('winnerAddress').textContent = winner;
+              document.getElementById('winningPrice').textContent = winningPrice;
+              document.getElementById('winnerBalance').textContent = winnerBalance;
+              document.getElementById('winnerInfo').classList.remove('hidden');
+            } else {
+              showStatus('finalizeStatus', 'Finalization failed', true);
+              addDebugMessage(`Finalization failed for request #${requestId}`);
+            }
+          } catch (error) {
+            console.error('Error finalizing request:', error);
+            showStatus('finalizeStatus', `Error finalizing: ${error.message}`, true);
+            addDebugMessage(`Error finalizing #${requestId}: ${error.message}`);
+          }
+        } else {
+          try {
+            tx = await contract.methods.finalizeRequest(requestId).send({ from: currentAccount });
+
+            showStatus('finalizeStatus', 'Request finalized successfully!');
+            addDebugMessage(`Request #${requestId} finalized in block ${tx.blockNumber}`);
+
+            transactions.push({
+              type: 'Finalize',
+              hash: tx.transactionHash,
+              block: tx.blockNumber,
+              status: 'Confirmed',
+              timestamp: Math.floor(Date.now() / 1000)
+            });
+
+            const updatedRequest = await contract.methods.requests(requestId).call();
+            const winner = updatedRequest[4];
+
+            const bids = await contract.methods.getBids(requestId).call();
+            let winningPrice = '0';
+            for (const bid of bids) {
+              if (bid[0].toLowerCase() === winner.toLowerCase()) {
+                winningPrice = bid[1];
+                break;
+              }
+            }
+
+            const winnerBalance = web3.utils.fromWei(await web3.eth.getBalance(winner), 'ether');
+
+            document.getElementById('winnerAddress').textContent = winner;
+            document.getElementById('winningPrice').textContent = winningPrice;
+            document.getElementById('winnerBalance').textContent = winnerBalance;
+            document.getElementById('winnerInfo').classList.remove('hidden');
+          } catch (error) {
+            console.error('Error finalizing request:', error);
+            showStatus('finalizeStatus', `Error finalizing: ${error.message}`, true);
+            addDebugMessage(`Error finalizing #${requestId}: ${error.message}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error in finalizeRequest function:', error);
+        showStatus('finalizeStatus', `Error: ${error.message}`, true);
+        addDebugMessage(`Error in finalizeRequest: ${error.message}`);
+      }
+    }
+
+    // Get request information
+    async function getRequestInfo() {
+      try {
+        if (!currentAccount) {
+          showStatus('requestInfo', "Please connect wallet first", true);
+          return;
+        }
+        
+        const requestId = document.getElementById('requestInfoId').value;
+        
+        if (!requestId || parseInt(requestId) <= 0) {
+          showStatus('requestInfo', "Please enter a valid Request ID", true);
+          return;
+        }
+        
+        document.getElementById('requestInfo').innerHTML = "<p>Loading request info...</p>";
+        addDebugMessage(`Getting info for request ${requestId}`);
+        
+        let requestInfo;
+        if (usingEthers) {
+          requestInfo = await contract.requests(requestId);
+        } else {
+          requestInfo = await contract.methods.requests(requestId).call();
+        }
+        
+        // Format deposit to ETH
+        let depositEth;
+        if (usingEthers) {
+          depositEth = ethers.utils.formatEther(requestInfo.deposit);
+        } else {
+          depositEth = web3.utils.fromWei(requestInfo.deposit, 'ether');
+        }
+        
+        // Build request info display
+        const infoHTML = `
+          <div class="bg-gray-100 p-3 rounded">
+            <h3 class="font-bold">Request #${requestId} Details</h3>
+            <p><strong>Customer:</strong> ${usingEthers ? requestInfo.customer : requestInfo[1]}</p>
+            <p><strong>Item ID:</strong> ${usingEthers ? requestInfo.itemId : requestInfo[2]}</p>
+            <p><strong>Deposit:</strong> ${depositEth} ETH</p>
+            <p><strong>Status:</strong> ${usingEthers ? (requestInfo.finalized ? "Finalized" : "Open") : (requestInfo[4] ? "Finalized" : "Open")}</p>
+            <p><strong>Winner:</strong> ${usingEthers ? 
+              (requestInfo.winner === ethers.constants.AddressZero ? "Not selected" : requestInfo.winner) : 
+              (requestInfo[5] === '0x0000000000000000000000000000000000000000' ? "Not selected" : requestInfo[5])}</p>
+          </div>`;
+        
+        document.getElementById('requestInfo').innerHTML = infoHTML;
+        addDebugMessage(`Retrieved info for request ${requestId}`);
+      } catch (error) {
+        document.getElementById('requestInfo').innerHTML = 
+          `<p class="text-red-600">Error: ${error.message}</p>`;
+        addDebugMessage(`Error fetching request info: ${error.message}`, true);
+      }
+    }
+
+    // Submit feedback for a transport request
+    async function submitFeedback() {
+      try {
+        if (!currentAccount) {
+          showStatus('feedbackStatus', "Please connect wallet first", true);
+          return;
+        }
+        
+        const requestId = document.getElementById('fbId').value;
+        const rating = document.getElementById('rating').value;
+        const comment = document.getElementById('comment').value;
+        
+        if (!requestId || parseInt(requestId) <= 0) {
+          showStatus('feedbackStatus', "Please enter a valid Request ID", true);
+          return;
+        }
+        
+        if (!rating || parseInt(rating) < 1 || parseInt(rating) > 5) {
+          showStatus('feedbackStatus', "Please enter a rating between 1-5", true);
+          return;
+        }
+        
+        if (!comment) {
+          showStatus('feedbackStatus', "Please enter a comment", true);
+          return;
+        }
+        
+        showStatus('feedbackStatus', "Submitting feedback...");
+        addDebugMessage(`Submitting feedback for request ${requestId}: ${rating} stars`);
+        
+        let tx;
+        if (usingEthers) {
+          tx = await contract.submitFeedback(requestId, rating, comment);
+          showStatus('feedbackStatus', `Transaction submitted: ${tx.hash}`);
+          addDebugMessage(`Transaction submitted: ${tx.hash}`);
+          
+          // Wait for transaction confirmation
+          await tx.wait();
+          showStatus('feedbackStatus', "Feedback submitted successfully!");
+          addDebugMessage(`Feedback submitted successfully in block: ${tx.blockNumber}`);
+          
+          // Add to transaction history
+          transactions.push({
+            type: "Submit Feedback",
+            hash: tx.hash,
+            block: tx.blockNumber,
+            status: "Confirmed",
+            timestamp: Math.floor(Date.now() / 1000)
+          });
+        } else {
+          tx = await contract.methods.submitFeedback(requestId, rating, comment).send({ from: currentAccount });
+          showStatus('feedbackStatus', "Feedback submitted successfully!");
+          addDebugMessage(`Feedback submitted successfully in block: ${tx.blockNumber}`);
+          
+          // Add to transaction history
+          transactions.push({
+            type: "Submit Feedback",
+            hash: tx.transactionHash,
+            block: tx.blockNumber,
+            status: "Confirmed",
+            timestamp: Math.floor(Date.now() / 1000)
+          });
+        }
+      } catch (error) {
+        showStatus('feedbackStatus', `Error: ${error.message}`, true);
+        addDebugMessage(`Error submitting feedback: ${error.message}`, true);
+      }
+    }
+
+    // Get feedback for a transport request
+    async function getFeedback() {
+      try {
+        if (!currentAccount) {
+          showStatus('feedbackResult', "Please connect wallet first", true);
+          return;
+        }
+        
+        const requestId = document.getElementById('feedbackReqId').value;
+        let userAddress = document.getElementById('userAddr').value;
+        
+        if (!requestId || parseInt(requestId) <= 0) {
+          showStatus('feedbackResult', "Please enter a valid Request ID", true);
+          return;
+        }
+        
+        // If no address provided, use current account
+        if (!userAddress) {
+          userAddress = currentAccount;
+        }
+        
+        document.getElementById('feedbackResult').innerHTML = "<p>Loading feedback...</p>";
+        addDebugMessage(`Getting feedback for request ${requestId}, user ${formatAddress(userAddress)}`);
+        
+        let feedback;
+        if (usingEthers) {
+          feedback = await contract.getFeedback(requestId, userAddress);
+        } else {
+          feedback = await contract.methods.getFeedback(requestId, userAddress).call();
+        }
+        
+        // Check if feedback exists
+        const exists = usingEthers ? feedback.exists : feedback[2];
+        
+        if (!exists) {
+          document.getElementById('feedbackResult').innerHTML = 
+            `<p class="text-yellow-600">No feedback found for this request and user</p>`;
+          addDebugMessage(`No feedback found for request ${requestId} and user ${formatAddress(userAddress)}`);
+          return;
+        }
+        
+        // Build feedback display
+        const rating = usingEthers ? feedback.rating : feedback[0];
+        const comment = usingEthers ? feedback.comment : feedback[1];
+        
+        const feedbackHTML = `
+          <div class="bg-gray-100 p-3 rounded">
+            <h3 class="font-bold">Feedback for Request #${requestId}</h3>
+            <p><strong>User:</strong> ${formatAddress(userAddress)}</p>
+            <p><strong>Rating:</strong> ${'⭐'.repeat(rating)} (${rating}/5)</p>
+            <p><strong>Comment:</strong> "${comment}"</p>
+          </div>`;
+        
+        document.getElementById('feedbackResult').innerHTML = feedbackHTML;
+        addDebugMessage(`Retrieved feedback for request ${requestId}`);
+      } catch (error) {
+        document.getElementById('feedbackResult').innerHTML = 
+          `<p class="text-red-600">Error: ${error.message}</p>`;
+        addDebugMessage(`Error fetching feedback: ${error.message}`, true);
+      }
+    }
+
+    // Load transaction history
+    function loadTransactionHistory() {
+      try {
+        if (transactions.length === 0) {
+          document.getElementById('transactionList').innerHTML = 
+            `<tr><td colspan="5" class="text-center p-4">No transactions recorded in this session</td></tr>`;
+          addDebugMessage("No transactions found in current session");
+          return;
+        }
+        
+        let transactionHTML = '';
+        
+        // Sort transactions by timestamp (newest first)
+        transactions.sort((a, b) => b.timestamp - a.timestamp);
+        
+        transactions.forEach(tx => {
+          transactionHTML += `
+            <tr>
+              <td class="border p-2">${tx.type}</td>
+              <td class="border p-2 font-mono">
+                <a href="https://sepolia.etherscan.io/tx/${tx.hash}" target="_blank" class="text-blue-600 hover:underline">
+                  ${tx.hash.substring(0, 10)}...
+                </a>
+              </td>
+              <td class="border p-2">${tx.block || 'Pending'}</td>
+              <td class="border p-2">
+                <span class="${tx.status === 'Confirmed' ? 'text-green-600' : 'text-yellow-600'}">
+                  ${tx.status}
+                </span>
+              </td>
+              <td class="border p-2">${formatTimestamp(tx.timestamp)}</td>
+            </tr>`;
+        });
+        
+        document.getElementById('transactionList').innerHTML = transactionHTML;
+        addDebugMessage(`Loaded ${transactions.length} transactions`);
+      } catch (error) {
+        addDebugMessage(`Error loading transaction history: ${error.message}`, true);
+      }
+    }
+  </script>
+</body>
+</html>
